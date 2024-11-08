@@ -10,7 +10,7 @@ class CertificationServiceTest {
 
   @Test
   @DisplayName("이메일과 컨텐츠가 제대로 만들어져서 보내지는지 테스트한다")
-  public void sendEmailAndContents () {
+  public void sendEmailAndContents() {
     // given
     FakeMailSender fakeMailSender = new FakeMailSender();
     CertificationService certificationService = new CertificationService(fakeMailSender);
