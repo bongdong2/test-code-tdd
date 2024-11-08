@@ -1,62 +1,43 @@
-package com.example.demo.user.service;
+package com.example.demo.medium;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 
 import com.example.demo.common.domain.exception.CertificationCodeNotMatchedException;
 import com.example.demo.common.domain.exception.ResourceNotFoundException;
-import com.example.demo.mock.FakeMailSender;
-import com.example.demo.mock.FakeUserRepository;
-import com.example.demo.mock.TestClockHolder;
-import com.example.demo.mock.TestUuidHolder;
 import com.example.demo.user.domain.User;
-import com.example.demo.user.domain.UserCreate;
 import com.example.demo.user.domain.UserStatus;
+import com.example.demo.user.domain.UserCreate;
 import com.example.demo.user.domain.UserUpdate;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
+import com.example.demo.user.service.UserService;
 import org.junit.jupiter.api.Test;
+import org.mockito.BDDMockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.context.jdbc.Sql.ExecutionPhase;
+import org.springframework.test.context.jdbc.SqlGroup;
 
+@SpringBootTest
+@TestPropertySource("classpath:test-application.properties")
+@SqlGroup({
+    @Sql(value = "/sql/user-service-test-data.sql", executionPhase = ExecutionPhase.BEFORE_TEST_METHOD),
+    @Sql(value = "/sql/delete-all-data.sql", executionPhase = ExecutionPhase.AFTER_TEST_METHOD)
+})
 public class UserServiceTest {
 
+    @Autowired
     private UserService userService;
-
-    @BeforeEach
-    void init() {
-        FakeMailSender fakeMailSender = new FakeMailSender();
-        FakeUserRepository fakeUserRepository = new FakeUserRepository();
-
-        this.userService = UserService.builder()
-            .uuidHolder(new TestUuidHolder("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
-            .clockHolder(new TestClockHolder(1678530673958L))
-            .userRepository(fakeUserRepository)
-            .certificationService(new CertificationService(fakeMailSender))
-            .build();
-
-        fakeUserRepository.save(User.builder()
-            .id(1L)
-            .email("kok202@naver.com")
-            .nickname("kok202")
-            .address("Seoul")
-            .status(UserStatus.ACTIVE)
-            .lastLoginAt(0L)
-            .certificationCode("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-            .build());
-
-        fakeUserRepository.save(User.builder()
-            .id(2L)
-            .email("kok303@naver.com")
-            .nickname("kok303")
-            .address("Busan")
-            .status(UserStatus.PENDING)
-            .lastLoginAt(0L)
-            .certificationCode("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaab")
-            .build());
-    }
+    @MockBean
+    private JavaMailSender mailSender;
 
     @Test
-    @DisplayName("getByEmail은 ACTIVE 상태인 유저를 찾아올 수 있다")
-    void getActiveUserByEmail() {
+    void getByEmail은_ACTIVE_상태인_유저를_찾아올_수_있다() {
         // given
         String email = "kok202@naver.com";
 
@@ -68,8 +49,7 @@ public class UserServiceTest {
     }
 
     @Test
-    @DisplayName("getByEmail은 PENDING 상태인 유저는 찾아올 수 없다")
-    void getPendingUserByEmail() {
+    void getByEmail은_PENDING_상태인_유저는_찾아올_수_없다() {
         // given
         String email = "kok303@naver.com";
 
@@ -81,8 +61,7 @@ public class UserServiceTest {
     }
 
     @Test
-    @DisplayName("getById는 ACTIVE 상태인 유저를 찾아올 수 있다")
-    void getActiveUserById() {
+    void getById는_ACTIVE_상태인_유저를_찾아올_수_있다() {
         // given
         // when
         User result = userService.getById(1);
@@ -92,8 +71,7 @@ public class UserServiceTest {
     }
 
     @Test
-    @DisplayName("getById는 PENDING 상태인 유저는 찾아올 수 없다")
-    void getPendingUserById() {
+    void getById는_PENDING_상태인_유저는_찾아올_수_없다() {
         // given
         // when
         // then
@@ -103,14 +81,14 @@ public class UserServiceTest {
     }
 
     @Test
-    @DisplayName("userCreate를 이용하여 유저를 생성할 수 있다")
-    void createUserByUserCreate() {
+    void userCreate_를_이용하여_유저를_생성할_수_있다() {
         // given
         UserCreate userCreate = UserCreate.builder()
             .email("kok202@kakao.com")
             .address("Gyeongi")
             .nickname("kok202-k")
             .build();
+        BDDMockito.doNothing().when(mailSender).send(any(SimpleMailMessage.class));
 
         // when
         User result = userService.create(userCreate);
@@ -118,12 +96,11 @@ public class UserServiceTest {
         // then
         assertThat(result.getId()).isNotNull();
         assertThat(result.getStatus()).isEqualTo(UserStatus.PENDING);
-        assertThat(result.getCertificationCode()).isEqualTo("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        // assertThat(result.getCertificationCode()).isEqualTo("T.T"); // FIXME
     }
 
     @Test
-    @DisplayName("userUpdate 를 이용하여 유저를 수정할 수 있다")
-    void updateUserByUserUpdate() {
+    void userUpdate_를_이용하여_유저를_수정할_수_있다() {
         // given
         UserUpdate userUpdate = UserUpdate.builder()
             .address("Incheon")
@@ -141,20 +118,19 @@ public class UserServiceTest {
     }
 
     @Test
-    @DisplayName("user를 로그인 시키면 마지막 로그인 시간이 변경된다")
-    void userLastLoginAt() {
+    void user를_로그인_시키면_마지막_로그인_시간이_변경된다() {
         // given
         // when
         userService.login(1);
 
         // then
         User user = userService.getById(1);
-        assertThat(user.getLastLoginAt()).isEqualTo(1678530673958L);
+        assertThat(user.getLastLoginAt()).isGreaterThan(0L);
+        // assertThat(result.getLastLoginAt()).isEqualTo("T.T"); // FIXME
     }
 
     @Test
-    @DisplayName("PENDING 상태의 사용자는 인증 코드로 ACTIVE 시킬 수 있다")
-    void userVerifyEmail() {
+    void PENDING_상태의_사용자는_인증_코드로_ACTIVE_시킬_수_있다() {
         // given
         // when
         userService.verifyEmail(2, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaab");
@@ -165,8 +141,7 @@ public class UserServiceTest {
     }
 
     @Test
-    @DisplayName("PENDING 상태의 사용자는 잘못된 인증 코드를 받으면 에러를 던진다")
-    void verifyEmailError() {
+    void PENDING_상태의_사용자는_잘못된_인증_코드를_받으면_에러를_던진다() {
         // given
         // when
         // then

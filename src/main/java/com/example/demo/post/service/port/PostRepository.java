@@ -7,5 +7,5 @@ public interface PostRepository {
 
   Optional<Post> findById(long id);
 
-  Post save(Post postEntity);
+  Post save(Post post);
 }
